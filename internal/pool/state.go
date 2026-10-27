@@ -307,9 +307,10 @@ func validSeedInventory(paths []string) bool {
 	return true
 }
 
-// recoverMissingStateEntries covers the narrow window where creating a Git
-// worktree succeeds but persisting its quarantine entry fails. Such a worktree
-// must remain unavailable even though the otherwise-valid state file omits it.
+// recoverMissingStateEntries quarantines on-disk worktrees omitted from an
+// otherwise-valid state file. Their reservation and seed inventory are unknown,
+// so they must remain unavailable until recovery proves them safe or they are
+// explicitly returned.
 func recoverMissingStateEntries(poolDir string, s State) (State, error) {
 	known := make(map[string]bool, len(s.Worktrees))
 	for _, wt := range s.Worktrees {
@@ -348,7 +349,8 @@ func recoverMissingStateEntries(poolDir string, s State) (State, error) {
 // RecoveredLeaseHolder marks a WorktreeEntry whose reservation and seed
 // inventory could not be trusted: one reconstructed by either recovery scan
 // (recoverMissingStateEntries or recoverCorruptState), or one ReadState
-// quarantined because its inventory failed to authenticate. treehouse 3.0.0
+// could not authenticate without an explicit incomplete-acquisition reservation.
+// treehouse 3.0.0
 // also put it on every entry of valid pre-3.0 state. None of these can be told
 // apart, so all stay leased until recoverQuarantinedEntries proves one safe or
 // a `return` naming the slot releases it; bulk `return --all` leaves them alone.

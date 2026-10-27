@@ -184,12 +184,12 @@ func releaseWorktree(target returnTarget, preconditions pool.ReleasePrecondition
 // unleased, so its new owner reservation is NOT detected - consistent with
 // `--all` reclaiming in-use slots by design. A leased slot with no ID (a state
 // file predating lease IDs) offers nothing to compare, so its release carries
-// only the recovered-entry refusal below.
+// only the quarantine refusal below.
 //
-// Every bulk release also refuses an entry that remains recovered after the
-// automatic safety check, including one recovered after the listing (for
-// example, when a state key is invalidated mid-run). Such a slot needs a named
-// return after inspection.
+// Every bulk release also refuses incomplete acquisitions and recovered entries
+// that the automatic safety check cannot free. The check runs under the release
+// lock, so quarantine applied after listing still requires inspection and a
+// named return.
 func bulkReturnPreconditions(wt pool.WorktreeStatus) pool.ReleasePreconditions {
 	if wt.Status == pool.StatusLeased {
 		if wt.LeaseID == "" {
@@ -246,15 +246,14 @@ func returnableStatus(wt pool.WorktreeStatus) bool {
 //
 // A slot is skipped, and the run neither fails nor reports an abort for it,
 // when the lease on it is no longer the one the listing saw (returned or taken
-// over since) or when it is a recovered slot (below). Nothing went wrong in
+// over since) or when it is a quarantined slot (below). Nothing went wrong in
 // either case, and calling them failures made a quarantined pool exit 1 on
 // every retry forever. A run where every slot was skipped still exits 0:
 // nothing it set out to return was still there to return.
 //
 // A slot nobody holds - available, damaged, or one the caller merely stands
-// in - is never a target at all and is counted separately. A recovered slot
-// that the automatic safety check cannot free (including a 3.0.0 upgrade
-// quarantine) is counted held and skipped; only a named return releases it.
+// in - is never a target at all and is counted separately. A slot protected
+// by the quarantine refusal above is counted held and skipped.
 func returnHeldWorktrees() error {
 	poolDir, err := repositoryPoolDir()
 	if err != nil {

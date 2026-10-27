@@ -922,9 +922,9 @@ func markAcquired(wt *WorktreeEntry, opts acquireOptions) error {
 // identifies the worktree's current lease.
 var ErrLeasePreconditionFailed = errors.New("lease precondition failed")
 
-// ErrRecoveredEntry reports that a release refusing recovered entries found the
-// worktree carrying RecoveredLeaseHolder. If automatic recovery cannot prove it
-// safe, bulk return refuses it; an operator may release it by naming the slot.
+// ErrRecoveredEntry reports that a release with RefuseRecovered found a
+// quarantined lease, as identified by IsQuarantinedLeaseHolder. Only a named
+// return may release it.
 var ErrRecoveredEntry = errors.New("recovered entry")
 
 // ErrOwnerPreconditionFailed reports that a release no longer identifies the
@@ -970,9 +970,9 @@ type ReleasePreconditions struct {
 	// live agent home, or a later acquisition - would still reset the worktree
 	// and clear that reservation when its subshell exits.
 	RequireOwnedByCaller bool
-	// RefuseRecovered refuses a worktree carrying RecoveredLeaseHolder. A bulk
-	// release sets it so an entry recovered after the listing, under the same
-	// state lock as the release, is left for a return that names it.
+	// RefuseRecovered refuses leased entries identified by IsQuarantinedLeaseHolder,
+	// including incomplete acquisitions. Bulk release checks it under the state
+	// lock so quarantine applied after listing still requires a named return.
 	RefuseRecovered bool
 }
 

@@ -405,6 +405,8 @@ Commands also restore an on-disk worktree that is missing from an otherwise vali
 Every restored entry is marked `leased` because treehouse cannot know whether it was idle, in-use, or durably leased.
 Both routes scan the pool directory, so a worktree that `worktree_path` placed outside it is not rebuilt — see [Worktree path](#worktree-path) for how to remove one.
 
+New acquisitions are recorded as `quarantined: acquisition state incomplete` before checkout starts, so an interrupted checkout stays reserved until inspected and returned by name. A linked Git worktree whose registration does not point back to its own `.git` is reported as damaged and is never read or reset through that registration.
+
 Run `treehouse status` to inspect recovered entries.
 State from 3.0 or later whose pool-local `treehouse-state.key` is missing, or whose seed inventory fails to verify, is handled the same way, and so is any state beside an invalid key.
 State from a release before 3.0 is the exception: it never seeded ignored files, so treehouse adopts it as is.

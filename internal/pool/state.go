@@ -149,7 +149,11 @@ func ReadState(poolDir string) (State, error) {
 		}
 		if s.Version != stateVersion || keyErr != nil || !validSeedInventoryDigest(key, *wt) {
 			wt.Leased = true
-			wt.LeaseHolder = RecoveredLeaseHolder
+			// An interrupted acquisition has a known cause and must not be
+			// mistaken for lost state or automatically released during recovery.
+			if wt.LeaseHolder != acquisitionIncompleteLeaseHolder {
+				wt.LeaseHolder = RecoveredLeaseHolder
+			}
 			wt.SeededPaths = nil
 			wt.SeedInventoryKnown = false
 			wt.SeedInventoryDigest = ""

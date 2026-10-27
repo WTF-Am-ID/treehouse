@@ -815,7 +815,7 @@ func TestAcquire_FinalStateWriteFailurePreservesSeedInventoryForRecovery(t *test
 	}
 }
 
-func TestAcquire_InitialStateWriteFailureRecoversCreatedWorktree(t *testing.T) {
+func TestAcquire_InitialStateWriteFailureDoesNotCreateWorktree(t *testing.T) {
 	repoDir, poolDir := setupLocalRepo(t)
 	oldWriteState := writeState
 	writeState = func(string, State) error { return errors.New("state write failed") }
@@ -832,8 +832,11 @@ func TestAcquire_InitialStateWriteFailureRecoversCreatedWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(state.Worktrees) != 1 || !state.Worktrees[0].Leased || state.Worktrees[0].LeaseHolder != RecoveredLeaseHolder {
-		t.Fatalf("created worktree was not conservatively recovered: %#v", state.Worktrees)
+	if len(state.Worktrees) != 0 {
+		t.Fatalf("worktree created before its reservation was recorded: %#v", state.Worktrees)
+	}
+	if _, err := os.Stat(filepath.Join(poolDir, "1", filepath.Base(repoDir))); !os.IsNotExist(err) {
+		t.Fatalf("worktree path exists after failed reservation: %v", err)
 	}
 }
 
@@ -1058,7 +1061,7 @@ func TestAcquire_ReusedCommittedFinalStateWriteErrorReturnsAcquisition(t *testin
 }
 
 func TestAcquire_NewCommittedStateWriteErrorsReturnLease(t *testing.T) {
-	for _, failAt := range []int{1, 2} {
+	for _, failAt := range []int{1, 2, 3} {
 		t.Run(fmt.Sprintf("write-%d", failAt), func(t *testing.T) {
 			repoDir, poolDir := setupLocalRepo(t)
 			oldWriteState := writeState

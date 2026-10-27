@@ -455,7 +455,7 @@ func WorktreeBackendNameChecked(path string) (string, error) {
 	if present, err := markerPresent(filepath.Join(path, ".git")); err != nil {
 		return "", err
 	} else if present {
-		if _, err := os.Stat(filepath.Join(path, ".git")); err != nil {
+		if err := gitvcs.ValidateWorktreeRegistration(path); err != nil {
 			return "", fmt.Errorf("resolving .git marker in %s: %w", path, err)
 		}
 		return "git", nil
@@ -513,6 +513,9 @@ func backendForRemoval(repoRoot, path string) Backend {
 // this refusal is defense in depth. Pool slots are the only callers of these
 // operations, so ordinary directories are unaffected.
 func destructiveBackendForWorktree(path string) (Backend, error) {
+	if _, err := WorktreeBackendNameChecked(path); err != nil {
+		return nil, err
+	}
 	if b := slotMarkerBackend(path); b != nil {
 		return b, nil
 	}

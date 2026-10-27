@@ -684,32 +684,9 @@ func acquire(repoRoot, poolDir string, poolSize int, postCreate []string, opts a
 			}
 		}
 
-		if err := vcs.AddWorktree(repoRoot, wtPath, branch); err != nil {
-			return fmt.Errorf("failed to create worktree: %w", err)
-		}
-		seededPaths, err := seedWorktree(repoRoot, wtPath, opts.includeManifest)
-		if err != nil {
-			// A failed removal leaves a real Git worktree behind. Keep it in
-			// state as quarantined so later acquisitions cannot reuse its slot.
-			if cleanupErr := removeWorktree(repoRoot, wtPath); cleanupErr != nil {
-				entry := WorktreeEntry{
-					Name:        name,
-					Path:        wtPath,
-					CreatedAt:   time.Now(),
-					BaseBranch:  opts.baseBranch,
-					Leased:      true,
-					LeaseHolder: "quarantined: worktree seeding cleanup failed",
-					LeasedAt:    time.Now(),
-				}
-				setSeedInventory(&entry, seededPaths, true)
-				state.Worktrees = append(state.Worktrees, entry)
-				if writeErr := WriteState(poolDir, state); writeErr != nil {
-					return fmt.Errorf("failed to seed .worktreeinclude into %s: %w (cleanup failed: %v; quarantine failed: %v)", wtPath, err, cleanupErr, writeErr)
-				}
-				return fmt.Errorf("failed to seed .worktreeinclude into %s: %w (cleanup failed: %v)", wtPath, err, cleanupErr)
-			}
-			return fmt.Errorf("failed to seed .worktreeinclude into %s: %w", wtPath, err)
-		}
+		// Persist before Git starts: signal cleanup may leave a partial checkout
+		// even when worktree add never returns. Its seed inventory is unknown
+		// until seeding completes, so this reservation must remain quarantined.
 		entry := WorktreeEntry{
 			Name:        name,
 			Path:        wtPath,
@@ -719,8 +696,40 @@ func acquire(repoRoot, poolDir string, poolSize int, postCreate []string, opts a
 			LeaseHolder: acquisitionIncompleteLeaseHolder,
 			LeasedAt:    time.Now(),
 		}
-		setSeedInventory(&entry, seededPaths, true)
 		state.Worktrees = append(state.Worktrees, entry)
+		if err := persistState(poolDir, state); err != nil {
+			return err
+		}
+		if err := vcs.AddWorktree(repoRoot, wtPath, branch); err != nil {
+			if _, statErr := os.Lstat(wtPath); os.IsNotExist(statErr) {
+				state.Worktrees = state.Worktrees[:len(state.Worktrees)-1]
+				if writeErr := WriteState(poolDir, state); writeErr != nil {
+					return fmt.Errorf("failed to create worktree: %w (state cleanup failed: %v)", err, writeErr)
+				}
+			}
+			return fmt.Errorf("failed to create worktree: %w", err)
+		}
+		seededPaths, err := seedWorktree(repoRoot, wtPath, opts.includeManifest)
+		if err != nil {
+			// A failed removal leaves a real Git worktree behind. Keep it in
+			// state as quarantined so later acquisitions cannot reuse its slot.
+			if cleanupErr := removeWorktree(repoRoot, wtPath); cleanupErr != nil {
+				entry.LeaseHolder = "quarantined: worktree seeding cleanup failed"
+				setSeedInventory(&entry, seededPaths, true)
+				state.Worktrees[len(state.Worktrees)-1] = entry
+				if writeErr := WriteState(poolDir, state); writeErr != nil {
+					return fmt.Errorf("failed to seed .worktreeinclude into %s: %w (cleanup failed: %v; quarantine failed: %v)", wtPath, err, cleanupErr, writeErr)
+				}
+				return fmt.Errorf("failed to seed .worktreeinclude into %s: %w (cleanup failed: %v)", wtPath, err, cleanupErr)
+			}
+			state.Worktrees = state.Worktrees[:len(state.Worktrees)-1]
+			if writeErr := WriteState(poolDir, state); writeErr != nil {
+				return fmt.Errorf("failed to seed .worktreeinclude into %s: %w (state cleanup failed: %v)", wtPath, err, writeErr)
+			}
+			return fmt.Errorf("failed to seed .worktreeinclude into %s: %w", wtPath, err)
+		}
+		setSeedInventory(&entry, seededPaths, true)
+		state.Worktrees[len(state.Worktrees)-1] = entry
 		if err := persistState(poolDir, state); err != nil {
 			return err
 		}
@@ -1183,11 +1192,12 @@ func List(poolDir string) ([]WorktreeStatus, error) {
 			if wt.Destroying {
 				continue
 			}
+			flavor, markerErr := vcs.WorktreeBackendNameChecked(wt.Path)
 			ws := WorktreeStatus{
 				Name:           wt.Name,
 				Path:           wt.Path,
 				Status:         StatusAvailable,
-				Flavor:         vcs.WorktreeBackendName(wt.Path),
+				Flavor:         flavor,
 				RecoveryReason: wt.RecoveryReason,
 				RecoveryBackup: recoveryBackup(poolDir, wt.Name),
 			}
@@ -1271,6 +1281,10 @@ func List(poolDir string) ([]WorktreeStatus, error) {
 			if wt.RecoveryError != "" {
 				ws.Status = StatusDamaged
 				ws.BranchErr = wt.RecoveryError
+			}
+			if markerErr != nil {
+				ws.Status = StatusDamaged
+				ws.BranchErr = markerErr.Error()
 			}
 
 			result = append(result, ws)

@@ -3,6 +3,7 @@ package pool
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +74,15 @@ func TestAbandonedRegistrationCannotModifyLiveSlot(t *testing.T) {
 			// A named return may clear the reservation, but must not reset the
 			// registration that belongs to the live slot in the other pool.
 			_ = Release(poolDir, leftover)
+			for _, dryRun := range []bool{true, false} {
+				result, err := PrunePoolWithOptions(poolDir, PruneOptions{DryRun: dryRun, PruneOrphans: true})
+				if err != nil || len(result.Candidates) != 0 || len(result.Pruned) != 0 {
+					t.Fatalf("prune accepted another slot's live registration: %+v, %v", result, err)
+				}
+				if _, err := os.Stat(leftover); err != nil {
+					t.Fatalf("prune removed an unverifiable slot: %v", err)
+				}
+			}
 			if err := vcs.ResetWorktree(leftover, "main"); err == nil {
 				t.Error("direct reset accepted another slot's registration")
 			}
@@ -83,6 +93,60 @@ func TestAbandonedRegistrationCannotModifyLiveSlot(t *testing.T) {
 				}
 			}
 			assertFileContents(t, filepath.Join(live, "README.md"), "staged live work\n")
+		})
+	}
+}
+
+func TestIncompleteAcquisitionRequiresNamedReturn(t *testing.T) {
+	for _, action := range []string{"validate", "release"} {
+		t.Run(action, func(t *testing.T) {
+			repo, poolDir := setupLocalRepo(t)
+			path, err := Acquire(repo, poolDir, 1, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, err := ReadState(poolDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state.Worktrees[0].Leased = true
+			state.Worktrees[0].LeaseHolder = acquisitionIncompleteLeaseHolder
+			setSeedInventory(&state.Worktrees[0], nil, false)
+			if err := WriteState(poolDir, state); err != nil {
+				t.Fatal(err)
+			}
+			marker := filepath.Join(path, "unfinished.txt")
+			if err := os.WriteFile(marker, []byte("unfinished\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			called := false
+			guarded := func() error { called = true; return nil }
+			preconditions := ReleasePreconditions{RefuseRecovered: true}
+			if action == "validate" {
+				err = ValidateReleasePreconditions(poolDir, path, preconditions, guarded)
+			} else {
+				err = ReleaseConditional(poolDir, path, "", preconditions, guarded)
+			}
+			if !errors.Is(err, ErrRecoveredEntry) || called {
+				t.Errorf("bulk %s = %v, guarded action called=%t", action, err, called)
+			}
+			state, err = ReadState(poolDir)
+			if err != nil || !state.Worktrees[0].Leased || state.Worktrees[0].LeaseHolder != acquisitionIncompleteLeaseHolder || state.Worktrees[0].SeedInventoryKnown {
+				t.Errorf("bulk return changed incomplete state: %+v, %v", state, err)
+			}
+			if data, err := os.ReadFile(marker); err != nil || string(data) != "unfinished\n" {
+				t.Errorf("bulk return reset incomplete slot: %q, %v", data, err)
+			}
+			if err := Release(poolDir, path); err != nil {
+				t.Fatalf("named return: %v", err)
+			}
+			state, err = ReadState(poolDir)
+			if err != nil || state.Worktrees[0].Leased || !state.Worktrees[0].SeedInventoryKnown {
+				t.Fatalf("named return did not release slot: %+v, %v", state, err)
+			}
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("named return did not reset slot: %v", err)
+			}
 		})
 	}
 }

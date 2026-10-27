@@ -2665,6 +2665,19 @@ func TestPruneAllPrunesBackingMissingOrphanOnlyWithExplicitFlag(t *testing.T) {
 	if err := Release(poolDir, wtPath); err != nil {
 		t.Fatalf("Release failed: %v", err)
 	}
+	marker := filepath.Join(wtPath, ".git")
+	data, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitDir := strings.TrimSpace(strings.TrimPrefix(string(data), "gitdir: "))
+	relative, err := filepath.Rel(wtPath, gitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, []byte("gitdir: "+relative+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.RemoveAll(repoDir); err != nil {
 		t.Fatalf("RemoveAll repo failed: %v", err)
 	}

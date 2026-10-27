@@ -216,6 +216,10 @@ var (
 
 const acquisitionIncompleteLeaseHolder = "quarantined: acquisition state incomplete"
 
+func IsQuarantinedLeaseHolder(holder string) bool {
+	return holder == RecoveredLeaseHolder || holder == acquisitionIncompleteLeaseHolder
+}
+
 func persistState(poolDir string, state State) error {
 	err := writeState(poolDir, state)
 	if err == nil {
@@ -1132,8 +1136,8 @@ func validateReleasePreconditions(wt WorktreeEntry, preconditions ReleasePrecond
 	if err := preconditions.check(); err != nil {
 		return err
 	}
-	if preconditions.RefuseRecovered && wt.Leased && wt.LeaseHolder == RecoveredLeaseHolder {
-		return fmt.Errorf("%w: worktree %s was recovered and is only returned by name", ErrRecoveredEntry, wt.Path)
+	if preconditions.RefuseRecovered && wt.Leased && IsQuarantinedLeaseHolder(wt.LeaseHolder) {
+		return fmt.Errorf("%w: worktree %s is quarantined and is only returned by name", ErrRecoveredEntry, wt.Path)
 	}
 	if preconditions.RequireUnleased {
 		if wt.Leased {

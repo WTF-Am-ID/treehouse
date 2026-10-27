@@ -269,9 +269,9 @@ func returnHeldWorktrees() error {
 	var targets []pool.WorktreeStatus
 	var notHeld, recovered int
 	for _, wt := range worktrees {
-		if wt.Status == pool.StatusLeased && wt.LeaseHolder == pool.RecoveredLeaseHolder {
+		if wt.Status == pool.StatusLeased && pool.IsQuarantinedLeaseHolder(wt.LeaseHolder) {
 			recovered++
-			fmt.Fprintf(os.Stderr, "🌳 Leaving %s at %s leased: it was recovered, so nothing proves it idle and it is only returned by name. Check it, then run: treehouse return %s\n", wt.Name, ui.PrettyPath(wt.Path), quoteReturnPath(wt.Path))
+			fmt.Fprintf(os.Stderr, "🌳 Leaving %s at %s leased: it is quarantined, so nothing proves it idle and it is only returned by name. Check it, then run: treehouse return %s\n", wt.Name, ui.PrettyPath(wt.Path), quoteReturnPath(wt.Path))
 			continue
 		}
 		if returnableStatus(wt) {
@@ -304,7 +304,7 @@ func returnHeldWorktrees() error {
 			fmt.Fprintf(os.Stderr, "   %s skipped: it is no longer the acquisition this run listed, so it was left alone (%v).\n", wt.Name, err)
 		case errors.Is(err, pool.ErrRecoveredEntry):
 			skipped = append(skipped, wt.Name)
-			fmt.Fprintf(os.Stderr, "   %s skipped: it was recovered since this run listed it, so it is only returned by name. Check it, then run: treehouse return %s\n", wt.Name, quoteReturnPath(wt.Path))
+			fmt.Fprintf(os.Stderr, "   %s skipped: it was quarantined since this run listed it, so it is only returned by name. Check it, then run: treehouse return %s\n", wt.Name, quoteReturnPath(wt.Path))
 		case errors.Is(err, errReturnAborted), errors.Is(err, errReturnAbortedNonTTY):
 			aborted = append(aborted, wt.Name)
 			fmt.Fprintf(os.Stderr, "   %s left as found: its uncommitted changes were kept.\n", wt.Name)

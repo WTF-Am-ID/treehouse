@@ -408,6 +408,7 @@ Both routes scan the pool directory, so a worktree that `worktree_path` placed o
 New acquisitions are recorded as `quarantined: acquisition state incomplete` before checkout starts. An interrupted acquisition keeps that reservation, even when its seeded-file inventory is unknown. It is never freed automatically or by `return --all`: inspect it and run `treehouse return <path>` by name, or remove it with `treehouse destroy <path> --include-leased --yes`. Ignored files seeded before the interruption may remain after return because their inventory is unknown.
 
 A linked Git worktree whose registration does not point back to its own `.git` is reported as damaged and is never read or reset through that registration.
+Destroy refuses a present but invalid marker, even with all `--include-*` flags. Inspect and repair the marker before retrying. A genuinely absent marker and a proven missing backing repository retain their existing explicit removal paths.
 
 Run `treehouse status` to inspect recovered entries.
 State from 3.0 or later whose pool-local `treehouse-state.key` is missing, or whose seed inventory fails to verify, is handled the same way, and so is any state beside an invalid key.

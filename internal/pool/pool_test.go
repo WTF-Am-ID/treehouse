@@ -232,8 +232,13 @@ func TestAcquire_CloneIdentityUnreadableCandidate(t *testing.T) {
 	if err := Release(poolDir, path); err != nil {
 		t.Fatal(err)
 	}
-	// Keep the slot and its marker, but make its Git identity unresolvable.
-	marker := []byte("gitdir: " + filepath.Join(filepath.Dir(repo), "missing.git") + "\n")
+	// Keep a valid backlink so the slot reaches clone-identity verification,
+	// but leave the repository metadata absent so that identity is unresolvable.
+	gitDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(gitDir, "gitdir"), []byte(filepath.Join(path, ".git")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := []byte("gitdir: " + gitDir + "\n")
 	if err := os.WriteFile(filepath.Join(path, ".git"), marker, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -2143,6 +2148,9 @@ func TestExecuteDestroy_KeepsStateWhenRemovalFails(t *testing.T) {
 	if err := os.MkdirAll(bogusGitDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(bogusGitDir, "gitdir"), []byte(filepath.Join(wtPath, ".git")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(wtPath, ".git"), []byte("gitdir: "+bogusGitDir+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -2320,6 +2328,9 @@ func TestDestroyPoolRefusesUnattributableWorktreePerPath(t *testing.T) {
 	_, poolDir, attributable, unattributable := acquireDisposableFromEachClone(t)
 	bogusGitDir := filepath.Join(t.TempDir(), "not-git-metadata")
 	if err := os.MkdirAll(bogusGitDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bogusGitDir, "gitdir"), []byte(filepath.Join(unattributable, ".git")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(unattributable, ".git"), []byte("gitdir: "+bogusGitDir+"\n"), 0o644); err != nil {

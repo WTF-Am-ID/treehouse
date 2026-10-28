@@ -408,7 +408,7 @@ Both routes scan the pool directory, so a worktree that `worktree_path` placed o
 New acquisitions are recorded as `quarantined: acquisition state incomplete` before checkout starts. An interrupted acquisition keeps that reservation, even when its seeded-file inventory is unknown. It is never freed automatically or by `return --all`: inspect it and run `treehouse return <path>` by name, or remove it with `treehouse destroy <path> --include-leased --yes`. Ignored files seeded before the interruption may remain after return because their inventory is unknown.
 
 A linked Git worktree whose registration does not point back to its own `.git` is reported as damaged and is never read or reset through that registration.
-Destroy refuses a present but invalid marker, even with all `--include-*` flags. Inspect and repair the marker before retrying. A genuinely absent marker and a proven missing backing repository retain their existing explicit removal paths.
+See [Destroying worktrees](#destroying-worktrees) for removal restrictions on damaged slots.
 
 Run `treehouse status` to inspect recovered entries.
 State from 3.0 or later whose pool-local `treehouse-state.key` is missing, or whose seed inventory fails to verify, is handled the same way, and so is any state beside an invalid key.
@@ -461,16 +461,18 @@ Like prune, destroy judges and removes each worktree through its own owning repo
 There is no cross-pool or global destroy: `--all` without a pool path is an error, so a stray command can never reach beyond the pool you named.
 
 Destroy is a dry run by default.
-It prints a risk-revealing preview - one or more status labels (`[disposable]`, `[leased]`, `[in-use:<pid>]`, `[unmerged]`, `[dirty]`, `[unverified]`, or a comma-separated combination such as `[leased,dirty]`), the path, and the size of each target - and removes nothing.
+It prints a risk-revealing preview - one or more status labels (`[disposable]`, `[leased]`, `[in-use:<pid>]`, `[unmerged]`, `[dirty]`, `[unverified]`, `[damaged]`, or a comma-separated combination such as `[leased,dirty]`), the path, and the size of each target - and removes nothing.
 Pass `--yes` to execute.
 It never prints a blind "all worktrees destroyed"; the summary always reports exactly what was destroyed and what was skipped.
 
-A bare `treehouse destroy <pool> --all --yes` removes only the genuinely disposable set (merged, clean, idle, unleased - the same set `prune` would take) and SKIPS everything else, telling you which flag would include it.
-Each risky class is its own opt-in, so removing risky worktrees can never be a reflexive `--yes`:
+A bare `treehouse destroy <pool> --all --yes` removes only the genuinely disposable set (merged, clean, idle, unleased - the same set `prune` would take) and SKIPS everything else, reporting the reason and any applicable opt-in flags.
+Each removable risky class is its own opt-in, so removing risky worktrees can never be a reflexive `--yes`:
 
 - `--include-unlanded` also removes worktrees with uncommitted changes, a HEAD not merged into the default branch, or contents treehouse cannot verify, such as a missing backing repository (irreversible data loss).
 - `--include-in-use` also removes worktrees with a running process or owner reservation; their processes are terminated cleanly first and their pids are shown in the preview.
 - `--include-leased` also removes a leased worktree, but only when you name the exact worktree path. Leased worktrees are NEVER removed by `--all`; combining `--include-leased` with `--all` is rejected.
+
+Destroy refuses a present but invalid marker as `[damaged]`, even with all `--include-*` flags. Inspect and repair the marker before retrying. A genuinely absent marker and a proven missing backing repository remain `[unverified]` and require `--include-unlanded`, plus any flags for other reported risks.
 
 A single named worktree that is skipped for lack of a flag makes the command exit non-zero, so scripts notice that nothing happened.
 Bulk `--all` skips are normal and exit zero; inspect the summary to see what remains.

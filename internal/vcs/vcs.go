@@ -447,10 +447,9 @@ func slotMarkerBackend(path string) Backend {
 	return nil
 }
 
-// slotMarkerBackend reports the backend a worktree's own marker names: a
-// .git entry means a git worktree, a .jj directory means a jj workspace.
-// Pool slots hold exactly one of the two (jj workspaces are never
-// colocated), so the marker identifies what the slot actually is regardless
+// WorktreeBackendNameChecked distinguishes a missing marker from one that
+// cannot be trusted. Linked Git worktrees must pass registration validation
+// before callers use the backend to read or modify the slot.
 func WorktreeBackendNameChecked(path string) (string, error) {
 	if present, err := markerPresent(filepath.Join(path, ".git")); err != nil {
 		return "", err

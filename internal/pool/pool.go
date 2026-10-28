@@ -28,6 +28,7 @@ const (
 	// from the process list (in-use) or from its absence (damaged, dirty,
 	// available) is reported. Leased, a live owner reservation, and "you're
 	// here" are facts known without a scan and still outrank it.
+	// Invalid markers and recovery inspection errors still report StatusDamaged.
 	StatusUnverified = "unverified"
 )
 
@@ -1268,12 +1269,8 @@ func List(poolDir string) ([]WorktreeStatus, error) {
 					ws.Status = StatusDirty
 				}
 			}
-			// Damaged is not overlaid. A missing marker is a different kind of
-			// fact from the reservations above: it says the slot's own contents
-			// cannot be judged at all, which is what `destroy` - not `return` -
-			// answers, and standing in such a slot does not make it any more
-			// readable. The recovery-scan case below already forces damaged
-			// back over the overlay for exactly this reason.
+			// Standing in a damaged slot does not make its contents verifiable,
+			// so cwd must not hide that classification from bulk-return filtering.
 			if !wt.Leased && !owned && ws.Status != StatusDamaged && process.WorktreeContainsCwd(wt.Path, cwd) {
 				ws.HeldOnlyByCwd = ws.Status == StatusAvailable
 				ws.Status = StatusHere

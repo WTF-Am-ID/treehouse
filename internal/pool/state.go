@@ -60,8 +60,7 @@ type WorktreeEntry struct {
 	// during a state-file recovery scan: its .git/.jj marker exists but could
 	// not be resolved (a dangling or self-referential symlink, a permission
 	// failure). The entry is otherwise a normal recovered entry - leased so
-	// Acquire and prune skip it and destroy removes it only via an explicit
-	// --include-leased target - but List reports it as damaged with this
+	// Acquire and prune skip it - but List reports it as damaged with this
 	// reason, so a skipped slot is visible and never reads as available or an
 	// ordinarily leased home.
 	RecoveryError string `json:"recovery_error,omitempty"`

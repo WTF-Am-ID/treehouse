@@ -505,8 +505,8 @@ func backendForRemoval(repoRoot, path string) Backend {
 }
 
 // destructiveBackendForWorktree dispatches the operations that rewrite a
-// worktree's checkout (reset, detach). Unlike backendForWorktree it refuses a
-// path holding no .git or .jj marker instead of falling back to the
+// worktree's checkout (reset, detach). Unlike backendForWorktree it refuses
+// paths with missing or invalid markers instead of falling back to the
 // configured backend, which in an in-project pool would resolve — and rewrite
 // — the repository ENCLOSING the pool. Callers guard markerless slots first;
 // this refusal is defense in depth. Pool slots are the only callers of these

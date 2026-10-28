@@ -251,7 +251,7 @@ func planAndDestroy(poolDir string, targets []WorktreeEntry, allowLeased bool, o
 
 // resolveDestroyContext keeps markerless slots out of the configured-backend
 // fallback, which could otherwise resolve and fetch a repository enclosing the
-// pool. An empty context keeps the damaged slot unverified.
+// pool. An empty context leaves classification to apply the marker restrictions.
 func resolveDestroyContext(resolveContext pruneContextResolver, wt WorktreeEntry) pruneContext {
 	if vcs.WorktreeBackendName(wt.Path) == "" {
 		return pruneContext{}

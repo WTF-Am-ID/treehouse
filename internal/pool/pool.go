@@ -31,6 +31,10 @@ const (
 	StatusUnverified = "unverified"
 )
 
+// DamagedWorktreeAdvice is shared by status and prune when a slot's marker
+// cannot be verified. It does not authorize bypassing the removal checks.
+const DamagedWorktreeAdvice = "inspect the worktree and repair its VCS marker before reuse. Check removal restrictions before deleting it"
+
 // WorktreeStatus describes one managed worktree as reported by List.
 type WorktreeStatus struct {
 	Name   string
@@ -495,15 +499,14 @@ func acquire(repoRoot, poolDir string, poolSize int, postCreate []string, opts a
 			}
 			flavor := vcs.WorktreeBackendName(wt.Path)
 			if flavor == "" {
-				// No .git or .jj marker: the slot is damaged or missing.
+				// The slot's marker is absent or cannot be verified.
 				// Every dispatch on such a path falls back to the
 				// configured backend, which in an in-project pool resolves
 				// the repository ENCLOSING the pool - the safety checks
 				// would vouch for that repository and the reset would
-				// rewrite it. Fail closed and leave the slot for destroy,
-				// which classifies it unverified and removes it only with
-				// --include-unlanded; prune skips it as unverifiable and
-				// neither path ever resets it.
+				// rewrite it. Fail closed: marker absence has an explicit
+				// cleanup path, but an invalid marker requires inspection
+				// and repair. Neither case authorizes a reset.
 				continue
 			}
 			if flavor != wantFlavor {
@@ -1022,8 +1025,8 @@ func ValidateReleasePreconditions(poolDir, worktreePath string, preconditions Re
 // A markerless slot (its .git/.jj marker is gone) is never reset or asked for a
 // branch: dispatch on such a path falls back to the configured backend, which
 // in an in-project pool resolves the repository ENCLOSING the pool. Its
-// reservation is still cleared so the slot is not stuck leased, and the damaged
-// slot is left for destroy; acquire refuses to reuse it.
+// reservation is still cleared so the slot is not stuck leased. Clearing the
+// reservation does not repair the marker or make the slot reusable.
 //
 // baseBranch parks the returned slot on the branch the pool cuts from; empty
 // falls back to the base the slot was acquired with, then to the inferred

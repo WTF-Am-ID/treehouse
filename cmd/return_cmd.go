@@ -205,10 +205,10 @@ func bulkReturnPreconditions(wt pool.WorktreeStatus) pool.ReleasePreconditions {
 //
 // Available is excluded because there is nothing to return: the slot is already
 // parked and a later `get` will hand it out. Damaged is excluded because its
-// marker is missing or unreadable, so neither the detach nor the reset a return
-// performs can be judged safe, and `destroy` - which `status` already spells out
-// for such a slot - is the verb that removes it. So is a slot reported
-// "you're here" that `pool.WorktreeStatus.HeldOnlyByCwd` marks as held by
+// marker is missing, unreadable, or invalid, so neither the detach nor the reset
+// a return performs can be judged safe. The marker requires inspection before
+// reuse or removal. A slot reported "you're here" is also excluded when
+// `pool.WorktreeStatus.HeldOnlyByCwd` marks it as held by
 // nobody: it is parked, clean and quiet, and the caller's own shell standing in
 // it is the only reason it is not reported available. `treehouse enter` is
 // documented to leave pool state untouched, so resetting such a slot - and
@@ -224,9 +224,9 @@ func bulkReturnPreconditions(wt pool.WorktreeStatus) pool.ReleasePreconditions {
 // gone is the whole point of the verb. Standing in a slot is not holding it,
 // which is why that one case is the exception rather than a narrowing.
 //
-// Naming a damaged slot, or the slot you are standing in, explicitly still
-// returns it, unchanged: the narrow target is a deliberate act, while the bulk
-// one must not surprise.
+// An explicit return can clear a missing-marker slot's reservation without
+// resetting its files. That does not repair its marker or make it reusable.
+// The narrow target is a deliberate act, while the bulk one must not surprise.
 func returnableStatus(wt pool.WorktreeStatus) bool {
 	if wt.HeldOnlyByCwd {
 		return false

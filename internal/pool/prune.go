@@ -682,7 +682,7 @@ func analyzeIdleWorktree(poolDir string, resolveContext pruneContextResolver, wt
 	}
 
 	if vcs.WorktreeBackendName(worktree.Path) == "" {
-		skipped = newPruneSkipped(wt.Name, wt.Path, pruneSkipCannotVerify, "no .git or .jj marker", "the slot's VCS marker is missing; remove it with 'treehouse destroy "+wt.Path+" --include-unlanded'")
+		skipped = newPruneSkipped(wt.Name, wt.Path, pruneSkipCannotVerify, "cannot verify VCS marker", DamagedWorktreeAdvice)
 		return worktree, skipped, true, pruneContext{}, nil
 	}
 

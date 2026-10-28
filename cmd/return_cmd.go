@@ -64,8 +64,8 @@ already resolves keeps resolving to exactly the same worktree.
 
 --all acts on every slot somebody is holding. It leaves alone a slot
 'treehouse status' reports 'available' (nothing to return) or 'damaged' (its
-marker cannot be read, so 'treehouse destroy' - not return - is what removes
-it), and a slot reported 'you're here' that is otherwise parked, clean and
+marker is missing or invalid; inspect it before attempting removal), and a
+slot reported 'you're here' that is otherwise parked, clean and
 quiet: standing in a slot is not holding it, and 'treehouse enter' promises not
 to touch pool state. Stand in a slot that is leased, dirty, or running
 something and --all returns it like any other.
@@ -79,9 +79,9 @@ a slot leased then is skipped unless that same lease is still on it, and a slot
 unleased then is skipped if it has been leased since. A slot handed to another
 plain 'treehouse get' carries no lease to compare, so it is returned like any
 other in-use slot. --all takes no path or name, and cannot be combined with the
---if-lease-* conditions, which target a single lease identity. A slot
-'treehouse status' reports as recovered is never returned by --all; check it
-and return it by name.`,
+--if-lease-* conditions, which target a single lease identity. Recovered
+entries and incomplete acquisitions are never returned by --all; inspect
+them and return each worktree by name.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Changed("if-lease-id") && returnIfLeaseID == "" {
 			return fmt.Errorf("--if-lease-id cannot be empty")
